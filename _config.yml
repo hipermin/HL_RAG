@@ -1,0 +1,39 @@
+# GitHub Pages 설정
+title: "차세대 멀티모달 RAG 시스템 아키텍처"
+description: "n8n 스타일 인터랙티브 노드 기반 인터페이스로 시각화하는 멀티모달 RAG 시스템"
+baseurl: ""
+url: ""
+
+# 빌드 설정
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+
+# 마크다운 설정
+markdown: kramdown
+highlighter: rouge
+
+# 제외할 파일들
+exclude:
+  - README.md
+  - LICENSE
+  - CNAME
+
+# 포함할 파일들
+include:
+  - _pages
+  - assets
+
+# 컬렉션 설정
+collections:
+  pages:
+    output: true
+    permalink: /:name/
+
+# 기본값
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"

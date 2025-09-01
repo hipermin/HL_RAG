@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>간편형 문서 기반 QA 시스템 아키텍처</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #f8fafc 100%);
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 16px 24px;
+            z-index: 20;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 100px;
+            left: 16px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .toolbar button {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .toolbar button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .toolbar button.reset {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .toolbar button.clear {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .toolbar button.switch {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        }
+
+        .toolbar button.switch:hover {
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        }
+
+        .toolbar button.deploy {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .toolbar button.deploy:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+        }
+
+        /* 상세 정보 패널 */
+        .detail-panel {
+            position: absolute;
+            top: 100px;
+            right: 16px;
+            width: 350px;
+            max-height: calc(100vh - 200px);
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(15px);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 15;
+            transform: translateX(400px);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        .detail-panel.visible {
+            transform: translateX(0);
+        }
+
+        .detail-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+        }
+
+        .detail-header h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detail-header p {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .detail-content {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: calc(100vh - 320px);
+        }
+
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .detail-section p, .detail-section ul {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.6;
+        }
+
+        .detail-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .detail-section li {
+            padding: 2px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .detail-section li::before {
+            content: "•";
+            color: #3b82f6;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        .canvas:active {
+            cursor: grabbing;
+        }
+
+        .viewport {
+            position: relative;
+            width: 200%;
+            height: 200%;
+            transform-origin: 0 0;
+        }
+
+        .svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .nodes-layer {
+            position: relative;
+            z-index: 2;
+        }
+
+        .node {
+            position: absolute;
+            min-width: 200px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            border: 2px solid transparent;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            user-select: none;
+        }
+
+        .node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .node.selected {
+            border-color: #3b82f6;
+            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3);
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .node-icon {
+            font-size: 20px;
+        }
+
+        .node-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            flex: 1;
+        }
+
+        .node-description {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        .node-type-input { border-color: #1e40af; }
+        .node-type-processing { border-color: #d97706; }
+        .node-type-storage { border-color: #7c2d12; }
+        .node-type-query { border-color: #ea580c; }
+        .node-type-output { border-color: #065f46; }
+
+        .connection-line {
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead-input);
+        }
+
+        .connection-input { stroke: #1e40af; marker-end: url(#arrowhead-input); }
+        .connection-processing { stroke: #d97706; marker-end: url(#arrowhead-processing); }
+        .connection-storage { stroke: #7c2d12; marker-end: url(#arrowhead-storage); }
+        .connection-query { stroke: #ea580c; marker-end: url(#arrowhead-query); }
+        .connection-output { stroke: #065f46; marker-end: url(#arrowhead-output); }
+
+        .save-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 1000;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* 배포 모달 스타일 */
+        .deploy-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .deploy-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .deploy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .deploy-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #64748b;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .close-btn:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .deploy-body {
+            padding: 24px;
+        }
+
+        .deploy-option {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .deploy-option h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0 0 8px 0;
+        }
+
+        .deploy-option p {
+            color: #64748b;
+            margin: 0 0 12px 0;
+            font-size: 14px;
+        }
+
+        .deploy-option ol {
+            color: #475569;
+            font-size: 14px;
+            margin: 12px 0;
+            padding-left: 20px;
+        }
+
+        .deploy-option ol li {
+            margin-bottom: 4px;
+        }
+
+        .deploy-option a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .deploy-option a:hover {
+            text-decoration: underline;
+        }
+
+        .deploy-tips {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid #10b981;
+        }
+
+        .deploy-tips h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0 0 12px 0;
+        }
+
+        .deploy-tips ul {
+            color: #475569;
+            font-size: 14px;
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .deploy-tips ul li {
+            margin-bottom: 4px;
+        }
+
+        .deploy-footer {
+            padding: 24px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .deploy-footer p {
+            margin: 0;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .deploy-footer a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .deploy-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .deploy-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .deploy-btn:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-1px);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* 좌측 하단 정보 패널 */
+        .info-panel {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            width: 380px;
+            max-height: 400px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(15px);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 15;
+            overflow: hidden;
+        }
+
+        .info-panel-header {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #059669, #047857);
+            color: white;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .info-panel-header h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-panel-header p {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.4;
+        }
+
+        .info-panel-content {
+            padding: 16px 20px;
+            overflow-y: auto;
+            max-height: 320px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #334155;
+        }
+
+        .info-section {
+            margin-bottom: 16px;
+        }
+
+        .info-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-section li {
+            padding: 4px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .info-section li::before {
+            content: "•";
+            color: #059669;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .feature-highlight {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #059669;
+            margin: 12px 0;
+        }
+
+        .feature-highlight h5 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #065f46;
+            margin-bottom: 6px;
+        }
+
+        .feature-highlight p {
+            font-size: 12px;
+            color: #065f46;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .toolbar {
+                top: 80px;
+                left: 8px;
+                right: 8px;
+                flex-direction: row;
+                overflow-x: auto;
+                gap: 4px;
+                padding: 8px;
+            }
+            
+            .toolbar button {
+                min-width: 80px;
+                font-size: 11px;
+                padding: 8px 12px;
+            }
+            
+            .detail-panel {
+                left: 8px;
+                right: 8px;
+                width: auto;
+                top: 140px;
+                transform: translateY(100vh);
+            }
+            
+            .detail-panel.visible {
+                transform: translateY(0);
+            }
+            
+            .header {
+                padding: 12px 16px;
+            }
+            
+            .header h1 {
+                font-size: 18px;
+            }
+            
+            .header p {
+                font-size: 12px;
+            }
+            
+            .node {
+                min-width: 160px;
+                padding: 12px;
+                margin: 16px;
+                flex-direction: row;
+                justify-content: center;
+            }
+            
+            .canvas {
+                margin-top: 120px;
+            }
+
+            .info-panel {
+                width: calc(100vw - 32px);
+                bottom: 100px;
+                max-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 간편형 문서 기반 QA 시스템</h1>
+            <p>OCR 기반 텍스트 추출과 벡터 검색을 활용한 실용적인 문서 질의응답 시스템</p>
+        </div>
+        
+        <div class="toolbar">
+            <button onclick="switchToMultimodal()" class="switch">🚀 멀티모달 보기</button>
+            <button onclick="showDeployGuide()" class="deploy" title="30초만에 링크 공유하기">🚀 배포하기</button>
+            <button onclick="editor.fitToScreen()">🎯 전체보기</button>
+            <button onclick="editor.zoomIn()" class="reset">🔍 확대</button>
+            <button onclick="editor.zoomOut()" class="reset">🔍 축소</button>
+            <button onclick="editor.exportWorkflow()" class="clear">📤 내보내기</button>
+        </div>
+
+        <!-- 상세 정보 패널 -->
+        <div class="detail-panel" id="detail-panel">
+            <button class="close-btn" onclick="editor.closeDetailPanel()">×</button>
+            <div class="detail-header">
+                <h3 id="detail-title">
+                    <span id="detail-icon">📚</span>
+                    노드를 선택하세요
+                </h3>
+                <p id="detail-description">노드를 클릭하면 상세한 기술 정보를 확인할 수 있습니다.</p>
+            </div>
+            <div class="detail-content">
+                <div class="detail-section tech-stack">
+                    <h4>🔧 기술스택</h4>
+                    <p id="detail-tech">노드를 선택하여 기술 스택을 확인하세요.</p>
+                </div>
+                <div class="detail-section">
+                    <h4>⚙️ 설정</h4>
+                    <p id="detail-config">노드를 선택하여 설정 정보를 확인하세요.</p>
+                </div>
+                <div class="detail-section">
+                    <h4>🌐 API</h4>
+                    <p id="detail-api">노드를 선택하여 API 정보를 확인하세요.</p>
+                </div>
+                <div class="detail-section">
+                    <h4>📊 성능</h4>
+                    <p id="detail-performance">노드를 선택하여 성능 정보를 확인하세요.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="canvas" id="canvas">
+            <div class="viewport" id="viewport">
+                <svg class="svg-layer" id="svg-layer">
+                    <defs>
+                        <marker id="arrowhead-input" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#1e40af" />
+                        </marker>
+                        <marker id="arrowhead-processing" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#d97706" />
+                        </marker>
+                        <marker id="arrowhead-storage" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#7c2d12" />
+                        </marker>
+                        <marker id="arrowhead-query" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#ea580c" />
+                        </marker>
+                        <marker id="arrowhead-output" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#065f46" />
+                        </marker>
+                    </defs>
+                </svg>
+                <div class="nodes-layer" id="nodes-layer"></div>
+            </div>
+        </div>
+
+        <!-- 좌측 하단 정보 패널 -->
+        <div class="info-panel">
+            <div class="info-panel-header">
+                <h3>📋 간편형 문서 이미지 QA 시스템</h3>
+                <p>원본 보존 + OCR 기반 - 멀티모달 AI 효과를 90% 비용으로 10% 달성하는 실용적 솔루션</p>
+            </div>
+            <div class="info-panel-content">
+                <div class="info-section">
+                    <h4>📋 시스템 개요</h4>
+                    <ul>
+                        <li>📄 PDF/DOCX를 페이지별 PNG 이미지로 변환</li>
+                        <li>🔤 Tesseract OCR로 텍스트 정확 추출 (92%)</li>
+                        <li>🧠 OpenAI 임베딩 + FAISS 벡터 검색</li>
+                        <li>📎 답변 시 관련 원본 페이지 이미지 자동 첨부</li>
+                        <li>🔗 22개 노드 완전한 엔드투엔드 워크플로우</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-highlight">
+                    <h5>💡 핵심 혁신</h5>
+                    <p><strong>멀티모달 AI 없이도 원본 이미지 보존!</strong> 복잡한 비전 AI 대신 페이지 이미지 변환으로 시각적 출처 제공. 구현 간단하면서도 사용자 신뢰도 획기적 향상.</p>
+                </div>
+                
+                <div class="info-section">
+                    <h4>🏗️ 건설업 특화 활용</h4>
+                    <ul>
+                        <li>📐 설계도면: "3층 배관 규격?" → 답변 + 도면 첨부</li>
+                        <li>📋 시공매뉴얼: "콘크리트 양생온도?" → 기준 + 매뉴얼 페이지</li>
+                        <li>📄 품질기준서: "마감재 허용오차?" → 규정 + 해당 페이지</li>
+                        <li>🔍 법규검색: "건축법 조항 확인" → 조문 + 원본 이미지</li>
+                    </ul>
+                </div>
+                
+                <div class="info-section">
+                    <h4>🔄 완전한 워크플로우</h4>
+                    <ul>
+                        <li>📤 업로드 → 🔍 검증 → 🖼️ 이미지변환(150DPI)</li>
+                        <li>🔤 OCR추출 → 🧹 정제 → 📝 청킹 → 🧠 임베딩</li>
+                        <li>🗄️ FAISS저장 + 🖼️ 이미지저장 (로컬/클라우드)</li>
+                        <li>❓ 질문입력 → 🔍 유사도검색 → 📑 관련문서추출</li>
+                        <li>🤖 GPT-4응답 → 📎 이미지첨부 → 📋 통합응답</li>
+                    </ul>
+                </div>
+                
+                <div class="info-section">
+                    <h4>⚙️ 인터랙티브 기능</h4>
+                    <ul>
+                        <li>🖱️ 노드 클릭: 22개 노드별 상세 기술스택 확인</li>
+                        <li>🖱️ 드래그&줌: 워크플로우 자유 탐색</li>
+                        <li>📤 JSON 내보내기: 아키텍처 정보 다운로드</li>
+                        <li>🚀 멀티모달 전환: 고급 AI 버전과 비교</li>
+                    </ul>
+                </div>
+                
+                <div class="info-section">
+                    <h4>📊 성능 & 비용</h4>
+                    <ul>
+                        <li>⚡ 처리속도: 30페이지/분 (이미지변환 포함)</li>
+                        <li>💰 비용효율: 멀티모달 대비 1/10 구현비용</li>
+                        <li>🎯 정확도: OCR 92% + 검색 85% (Recall@10)</li>
+                        <li>💾 저장용량: 평균 1MB/페이지 (PNG 압축)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 멀티모달 시스템으로 전환하는 함수
+        function switchToMultimodal() {
+            // 알림 표시
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                color: white;
+                padding: 20px 30px;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 600;
+                z-index: 1000;
+                box-shadow: 0 8px 32px rgba(139, 92, 246, 0.4);
+                animation: fadeInScale 0.3s ease-out;
+            `;
+            notification.innerHTML = '🚀 멀티모달 RAG 시스템으로 전환 중...';
+            document.body.appendChild(notification);
+
+            // 1초 후 페이지 이동
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
+        }
+
+        // 배포 가이드 표시
+        function showDeployGuide() {
+            const modal = document.createElement('div');
+            modal.className = 'deploy-modal';
+            modal.innerHTML = `
+                <div class="deploy-content">
+                    <div class="deploy-header">
+                        <h2>🚀 빠른 배포 및 링크 공유</h2>
+                        <button onclick="closeDeployModal()" class="close-btn">✕</button>
+                    </div>
+                    <div class="deploy-body">
+                        <div class="deploy-option">
+                            <h3>🔥 추천: GitHub Pages (무료)</h3>
+                            <p>3분 만에 영구 링크 생성</p>
+                            <ol>
+                                <li>GitHub 저장소 생성</li>
+                                <li>프로젝트 파일 업로드</li>
+                                <li>Settings > Pages > GitHub Actions 선택</li>
+                                <li>자동 배포 완료!</li>
+                            </ol>
+                            <p><strong>접속 주소:</strong> https://[사용자명].github.io/[저장소명]</p>
+                        </div>
+                        
+                        <div class="deploy-option">
+                            <h3>⚡ 가장 빠른: Netlify</h3>
+                            <p>30초 만에 즉시 링크 생성</p>
+                            <ol>
+                                <li><a href="https://netlify.com" target="_blank">netlify.com</a> 접속</li>
+                                <li>"New site from Git" 클릭</li>
+                                <li>GitHub 저장소 연결 & Deploy</li>
+                            </ol>
+                            <p><strong>접속 주소:</strong> https://[랜덤이름].netlify.app</p>
+                        </div>
+                        
+                        <div class="deploy-option">
+                            <h3>🎯 고성능: Vercel</h3>
+                            <p>1분 만에 초고속 링크 생성</p>
+                            <ol>
+                                <li><a href="https://vercel.com" target="_blank">vercel.com</a> 접속</li>
+                                <li>"New Project" > GitHub 연결</li>
+                                <li>Deploy 클릭</li>
+                            </ol>
+                            <p><strong>접속 주소:</strong> https://[프로젝트명].vercel.app</p>
+                        </div>
+                        
+                        <div class="deploy-tips">
+                            <h3>💡 건설업계 추천</h3>
+                            <ul>
+                                <li><strong>사내 데모:</strong> Netlify (가장 빠름)</li>
+                                <li><strong>고객 프레젠테이션:</strong> Vercel (고성능)</li>
+                                <li><strong>장기 운영:</strong> GitHub Pages (안정적)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="deploy-footer">
+                        <p>📋 자세한 가이드: <a href="QUICK-DEPLOY.md" target="_blank">QUICK-DEPLOY.md</a></p>
+                        <button onclick="closeDeployModal()" class="deploy-btn">시작하기</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function closeDeployModal() {
+            const modal = document.querySelector('.deploy-modal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        class SimplifiedRAGEditor {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.viewport = document.getElementById('viewport');
+                this.svgLayer = document.getElementById('svg-layer');
+                this.nodesLayer = document.getElementById('nodes-layer');
+                this.detailPanel = document.getElementById('detail-panel');
+                
+                this.nodes = [];
+                this.connections = [];
+                this.scale = 1;
+                this.panX = 0;
+                this.panY = 0;
+                this.isDragging = false;
+                this.isNodeDragging = false;
+                this.dragStart = { x: 0, y: 0 };
+                this.selectedNode = null;
+                this.mouseMovedThreshold = 5;
+                this.initialMousePos = { x: 0, y: 0 };
+                
+                this.initializeNodes();
+                this.initializeConnections();
+                this.bindEvents();
+                this.render();
+                
+                // 자동 저장 (5초마다)
+                setInterval(() => {
+                    this.saveLayout();
+                }, 5000);
+            }
+
+            initializeNodes() {
+                this.nodes = [
+                    // 입력 단계
+                    { id: 'upload', x: 50, y: 100, type: 'input', icon: '📤', title: '문서 업로드', description: 'PDF, DOCX, TXT 파일 업로드' },
+                    { id: 'validate', x: 300, y: 100, type: 'input', icon: '🔍', title: '파일 검증', description: '파일 형식 및 크기 검증' },
+                    { id: 'convert', x: 550, y: 100, type: 'processing', icon: '🖼️', title: '이미지 변환', description: 'pdf2image 페이지별 PNG 변환' },
+                    { id: 'extract', x: 800, y: 100, type: 'processing', icon: '🔤', title: 'OCR 텍스트 추출', description: 'Tesseract + EasyOCR 텍스트 추출' },
+                    
+                    // 전처리 단계
+                    { id: 'clean', x: 50, y: 300, type: 'processing', icon: '🧹', title: '텍스트 정제', description: '노이즈 제거 및 정규화' },
+                    { id: 'chunk', x: 300, y: 300, type: 'processing', icon: '📝', title: '텍스트 분할', description: '의미 단위로 텍스트 청킹' },
+                    { id: 'embed', x: 550, y: 300, type: 'processing', icon: '🧠', title: '임베딩 생성', description: 'OpenAI text-embedding-3 모델' },
+                    
+                    // 저장 단계
+                    { id: 'vector-store', x: 800, y: 300, type: 'storage', icon: '🗄️', title: '벡터 저장', description: 'FAISS 벡터 인덱스 저장' },
+                    { id: 'image-store', x: 1050, y: 100, type: 'storage', icon: '🖼️', title: '이미지 저장', description: '페이지별 PNG 이미지 저장' },
+                    { id: 'metadata', x: 1050, y: 300, type: 'storage', icon: '🏷️', title: '메타데이터 저장', description: 'SQLite 메타데이터 저장' },
+                    { id: 'text-store', x: 800, y: 500, type: 'storage', icon: '📄', title: '원본 텍스트', description: '원본 텍스트 및 청크 저장' },
+                    
+                    // 검색 단계
+                    { id: 'query-input', x: 50, y: 700, type: 'query', icon: '❓', title: '사용자 질문', description: '자연어 질문 입력' },
+                    { id: 'query-embed', x: 300, y: 700, type: 'query', icon: '🔍', title: '질문 임베딩', description: '질문을 벡터로 변환' },
+                    { id: 'similarity', x: 550, y: 700, type: 'query', icon: '📊', title: '유사도 검색', description: 'FAISS 코사인 유사도 검색' },
+                    { id: 'retrieve', x: 800, y: 700, type: 'query', icon: '📑', title: '관련 문서 검색', description: '상위 K개 관련 문서 추출' },
+                    
+                    // 생성 단계
+                    { id: 'context', x: 1300, y: 500, type: 'output', icon: '📋', title: '컨텍스트 구성', description: '검색된 문서로 컨텍스트 생성' },
+                    { id: 'prompt', x: 1300, y: 300, type: 'output', icon: '💬', title: '프롬프트 생성', description: '질문과 컨텍스트 결합' },
+                    { id: 'llm', x: 1300, y: 100, type: 'output', icon: '🤖', title: 'LLM 응답 생성', description: 'GPT-4 기반 답변 생성' },
+                    { id: 'source', x: 1550, y: 100, type: 'output', icon: '🔗', title: '출처 첨부', description: '관련 문서 출처 정보' },
+                    { id: 'image-attach', x: 1550, y: 300, type: 'output', icon: '📎', title: '이미지 첨부', description: '관련 페이지 이미지 첨부' },
+                    { id: 'format', x: 1550, y: 500, type: 'output', icon: '✨', title: '응답 포맷팅', description: '최종 응답 형식 정리' },
+                    { id: 'response', x: 1800, y: 300, type: 'output', icon: '📋', title: '최종 응답', description: '답변 + 출처 + 이미지 통합' }
+                ];
+            }
+
+            initializeConnections() {
+                this.connections = [
+                    // 문서 처리 플로우
+                    { from: 'upload', to: 'validate', type: 'input' },
+                    { from: 'validate', to: 'convert', type: 'processing' },
+                    { from: 'convert', to: 'extract', type: 'processing' },
+                    { from: 'extract', to: 'clean', type: 'processing' },
+                    { from: 'clean', to: 'chunk', type: 'processing' },
+                    { from: 'chunk', to: 'embed', type: 'processing' },
+                    
+                    // 저장 플로우
+                    { from: 'embed', to: 'vector-store', type: 'storage' },
+                    { from: 'convert', to: 'image-store', type: 'storage' },
+                    { from: 'validate', to: 'metadata', type: 'storage' },
+                    { from: 'chunk', to: 'text-store', type: 'storage' },
+                    
+                    // 질의 플로우
+                    { from: 'query-input', to: 'query-embed', type: 'query' },
+                    { from: 'query-embed', to: 'similarity', type: 'query' },
+                    { from: 'vector-store', to: 'similarity', type: 'query' },
+                    { from: 'similarity', to: 'retrieve', type: 'query' },
+                    { from: 'text-store', to: 'retrieve', type: 'query' },
+                    
+                    // 응답 생성 플로우
+                    { from: 'retrieve', to: 'context', type: 'output' },
+                    { from: 'context', to: 'prompt', type: 'output' },
+                    { from: 'query-input', to: 'prompt', type: 'output' },
+                    { from: 'prompt', to: 'llm', type: 'output' },
+                    { from: 'llm', to: 'source', type: 'output' },
+                    { from: 'metadata', to: 'source', type: 'output' },
+                    { from: 'image-store', to: 'image-attach', type: 'output' },
+                    { from: 'source', to: 'image-attach', type: 'output' },
+                    { from: 'source', to: 'format', type: 'output' },
+                    { from: 'image-attach', to: 'format', type: 'output' },
+                    { from: 'format', to: 'response', type: 'output' }
+                ];
+            }
+
+            bindEvents() {
+                // 캔버스 이벤트
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+                
+                // 키보드 이벤트
+                document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+                
+                // 윈도우 리사이즈
+                window.addEventListener('resize', () => this.updateSVGDimensions());
+            }
+
+            handleMouseDown(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - this.panX) / this.scale;
+                const y = (e.clientY - rect.top - this.panY) / this.scale;
+                
+                this.initialMousePos = { x: e.clientX, y: e.clientY };
+                
+                const clickedNode = this.getNodeAt(x, y);
+                if (clickedNode) {
+                    this.selectedNode = clickedNode;
+                    this.isNodeDragging = true;
+                    this.dragStart = { 
+                        x: e.clientX - clickedNode.x * this.scale,
+                        y: e.clientY - clickedNode.y * this.scale
+                    };
+                } else {
+                    this.isDragging = true;
+                    this.dragStart = { x: e.clientX - this.panX, y: e.clientY - this.panY };
+                    this.closeDetailPanel();
+                }
+                
+                e.preventDefault();
+            }
+
+            handleMouseMove(e) {
+                if (this.isNodeDragging && this.selectedNode) {
+                    this.selectedNode.x = (e.clientX - this.dragStart.x) / this.scale;
+                    this.selectedNode.y = (e.clientY - this.dragStart.y) / this.scale;
+                    this.render();
+                } else if (this.isDragging) {
+                    this.panX = e.clientX - this.dragStart.x;
+                    this.panY = e.clientY - this.dragStart.y;
+                    this.render();
+                }
+            }
+
+            handleMouseUp(e) {
+                if (this.isNodeDragging) {
+                    const moved = Math.abs(e.clientX - this.initialMousePos.x) > this.mouseMovedThreshold ||
+                                 Math.abs(e.clientY - this.initialMousePos.y) > this.mouseMovedThreshold;
+                    
+                    if (moved) {
+                        this.saveLayout();
+                    } else if (this.selectedNode) {
+                        this.showNodeDetails(this.selectedNode);
+                    }
+                }
+                
+                this.isDragging = false;
+                this.isNodeDragging = false;
+                this.selectedNode = null;
+            }
+
+            handleWheel(e) {
+                e.preventDefault();
+                const rect = this.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const oldScale = this.scale;
+                const scaleMultiplier = e.deltaY > 0 ? 0.9 : 1.1;
+                this.scale = Math.max(0.1, Math.min(3, this.scale * scaleMultiplier));
+                
+                // 마우스 위치를 중심으로 확대/축소
+                const scaleRatio = this.scale / oldScale;
+                this.panX = mouseX - (mouseX - this.panX) * scaleRatio;
+                this.panY = mouseY - (mouseY - this.panY) * scaleRatio;
+                
+                this.render();
+            }
+
+            handleKeyDown(e) {
+                if (e.key === 'Escape') {
+                    this.closeDetailPanel();
+                }
+            }
+
+            getNodeAt(x, y) {
+                return this.nodes.find(node => {
+                    return x >= node.x && x <= node.x + 200 &&
+                           y >= node.y && y <= node.y + 80;
+                });
+            }
+
+            showNodeDetails(node) {
+                const techDetails = this.getNodeTechDetails(node.id);
+                
+                document.getElementById('detail-icon').textContent = node.icon;
+                document.getElementById('detail-title').innerHTML = `
+                    <span id="detail-icon">${node.icon}</span>
+                    ${node.title}
+                `;
+                document.getElementById('detail-description').textContent = node.description;
+                document.getElementById('detail-tech').innerHTML = techDetails.tech;
+                document.getElementById('detail-config').innerHTML = techDetails.config;
+                document.getElementById('detail-api').innerHTML = techDetails.api;
+                document.getElementById('detail-performance').innerHTML = techDetails.performance;
+                
+                this.detailPanel.classList.add('visible');
+            }
+
+            getNodeTechDetails(nodeId) {
+                const details = {
+                    'upload': {
+                        tech: '<ul><li>Flask/FastAPI (웹 서버)</li><li>Werkzeug (파일 업로드)</li><li>python-magic (MIME 검증)</li></ul>',
+                        config: '<ul><li>최대 파일 크기: 50MB</li><li>지원 형식: PDF, DOCX, TXT</li><li>업로드 폴더: ./uploads</li></ul>',
+                        api: '<code>POST /upload</code><br>Content-Type: multipart/form-data',
+                        performance: '<ul><li>업로드 속도: 20MB/s</li><li>동시 처리: 5개</li></ul>'
+                    },
+                    'validate': {
+                        tech: '<ul><li>python-magic (MIME 타입 검증)</li><li>os.path (파일 크기 체크)</li><li>pathlib (확장자 검증)</li></ul>',
+                        config: '<ul><li>허용 MIME: application/pdf, text/plain</li><li>최대 크기: 50MB</li></ul>',
+                        api: '<code>POST /validate</code><br>Response: {"valid": true}',
+                        performance: '<ul><li>검증 시간: 평균 100ms</li><li>정확도: 99.9%</li></ul>'
+                    },
+                    'convert': {
+                        tech: '<ul><li>pdf2image (PDF → PNG 변환)</li><li>Pillow (이미지 처리)</li><li>python-docx2txt (DOCX 변환)</li><li>ImageMagick (이미지 최적화)</li></ul>',
+                        config: '<ul><li>DPI: 150 (간편형)</li><li>형식: PNG</li><li>압축: 중간 품질</li><li>색상: RGB</li></ul>',
+                        api: '<code>POST /convert</code><br>Response: {"images": [{"page": 1, "path": "./images/doc1_p1.png"}]}',
+                        performance: '<ul><li>변환 속도: 30페이지/분</li><li>이미지 크기: 평균 1MB</li><li>품질: 150DPI</li></ul>'
+                    },
+                    'extract': {
+                        tech: '<ul><li>Tesseract 5.0 (OCR 엔진)</li><li>EasyOCR (다국어 지원)</li><li>PyPDF2 (PDF 텍스트 추출)</li><li>python-docx (DOCX 처리)</li></ul>',
+                        config: '<ul><li>언어: 한국어, 영어</li><li>DPI: 300</li><li>신뢰도 임계값: 60%</li></ul>',
+                        api: '<code>POST /extract</code><br>Response: {"text": "추출된 텍스트"}',
+                        performance: '<ul><li>처리 속도: 5페이지/분</li><li>정확도: 92%</li></ul>'
+                    },
+                    'clean': {
+                        tech: '<ul><li>re (정규표현식)</li><li>unicodedata (유니코드 정규화)</li><li>NLTK (불용어 제거)</li></ul>',
+                        config: '<ul><li>불용어: 한국어, 영어</li><li>최소 길이: 2글자</li><li>특수문자 제거</li></ul>',
+                        api: '<code>POST /clean</code><br>Response: {"cleaned_text": "..."}',
+                        performance: '<ul><li>처리 속도: 1MB/초</li><li>노이즈 제거율: 95%</li></ul>'
+                    },
+                    'chunk': {
+                        tech: '<ul><li>LangChain TextSplitter</li><li>tiktoken (토큰 카운팅)</li><li>spaCy (문장 분할)</li></ul>',
+                        config: '<ul><li>청크 크기: 1000 토큰</li><li>오버랩: 200 토큰</li><li>분할 기준: 문장 단위</li></ul>',
+                        api: '<code>POST /chunk</code><br>Response: {"chunks": ["...", "..."]}',
+                        performance: '<ul><li>분할 속도: 10K 토큰/초</li><li>청크 개수: 평균 50개/문서</li></ul>'
+                    },
+                    'embed': {
+                        tech: '<ul><li>OpenAI API (text-embedding-3-small)</li><li>sentence-transformers (로컬 대안)</li><li>numpy (벡터 연산)</li></ul>',
+                        config: '<ul><li>모델: text-embedding-3-small</li><li>차원: 1536</li><li>배치 크기: 100</li></ul>',
+                        api: '<code>POST /embed</code><br>Response: {"embeddings": [[0.1, ...], ...]}',
+                        performance: '<ul><li>임베딩 속도: 1000개/분</li><li>비용: $0.02/1M 토큰</li></ul>'
+                    },
+                    'vector-store': {
+                        tech: '<ul><li>FAISS (Facebook AI Similarity Search)</li><li>pickle (인덱스 저장)</li><li>numpy (벡터 연산)</li></ul>',
+                        config: '<ul><li>인덱스 타입: IndexFlatIP</li><li>메트릭: 내적 (Inner Product)</li><li>저장 경로: ./faiss_index</li></ul>',
+                        api: '<code>POST /vector/add</code><br><code>GET /vector/search</code>',
+                        performance: '<ul><li>검색 속도: 1ms</li><li>확장성: 100K 벡터</li></ul>'
+                    },
+                    'image-store': {
+                        tech: '<ul><li>파일 시스템 저장</li><li>PNG 이미지 형식</li><li>디렉토리 구조 관리</li><li>이미지 메타데이터</li></ul>',
+                        config: '<ul><li>저장 경로: ./images/</li><li>명명 규칙: {doc_id}_p{page}.png</li><li>압축: PNG 최적화</li><li>백업: 선택적</li></ul>',
+                        api: '<code>POST /images/store</code><br><code>GET /images/{doc_id}/{page}</code><br>Response: 이미지 파일 또는 Base64',
+                        performance: '<ul><li>저장 속도: 10MB/s</li><li>용량: 평균 1MB/페이지</li><li>접근 시간: 50ms</li></ul>'
+                    },
+                    'metadata': {
+                        tech: '<ul><li>SQLite3 (경량 데이터베이스)</li><li>sqlite3 (Python 표준 라이브러리)</li></ul>',
+                        config: '<ul><li>테이블: documents, chunks</li><li>인덱스: doc_id, chunk_id</li><li>DB 파일: ./metadata.db</li></ul>',
+                        api: '<code>GET /metadata/{doc_id}</code><br>Response: {"title": "...", "pages": 10}',
+                        performance: '<ul><li>쿼리 속도: 평균 5ms</li><li>저장 용량: 1MB/1K 문서</li></ul>'
+                    },
+                    'text-store': {
+                        tech: '<ul><li>파일 시스템 저장</li><li>JSON 형식</li><li>gzip 압축</li></ul>',
+                        config: '<ul><li>저장 경로: ./text_chunks/</li><li>파일 포맷: {doc_id}.json.gz</li><li>압축률: 70%</li></ul>',
+                        api: '<code>GET /text/{doc_id}</code><br>Response: {"chunks": ["...", "..."]}',
+                        performance: '<ul><li>읽기 속도: 100MB/s</li><li>압축률: 70%</li></ul>'
+                    },
+                    'query-input': {
+                        tech: '<ul><li>HTML Form</li><li>JavaScript (프론트엔드)</li><li>WebSocket (선택적)</li></ul>',
+                        config: '<ul><li>최대 길이: 500자</li><li>인코딩: UTF-8</li><li>검증: 필수 입력</li></ul>',
+                        api: '<code>POST /query</code><br>Body: {"question": "질문 내용"}',
+                        performance: '<ul><li>응답 시간: 즉시</li><li>동시 사용자: 100명</li></ul>'
+                    },
+                    'query-embed': {
+                        tech: '<ul><li>OpenAI API (동일 모델)</li><li>캐싱 (Redis/메모리)</li></ul>',
+                        config: '<ul><li>모델: text-embedding-3-small</li><li>캐시 TTL: 1시간</li></ul>',
+                        api: '<code>POST /query/embed</code><br>Response: {"embedding": [0.1, ...]}',
+                        performance: '<ul><li>임베딩 시간: 500ms</li><li>캐시 적중률: 80%</li></ul>'
+                    },
+                    'similarity': {
+                        tech: '<ul><li>FAISS 검색</li><li>코사인 유사도</li><li>numpy 벡터 연산</li></ul>',
+                        config: '<ul><li>상위 K개: 10</li><li>유사도 임계값: 0.7</li><li>검색 범위: 전체 인덱스</li></ul>',
+                        api: '<code>POST /search/similarity</code><br>Response: {"results": [{"id": 1, "score": 0.95}]}',
+                        performance: '<ul><li>검색 시간: 10ms</li><li>정확도: Recall@10: 0.85</li></ul>'
+                    },
+                    'retrieve': {
+                        tech: '<ul><li>SQLite 조인 쿼리</li><li>파일 시스템 읽기</li><li>JSON 파싱</li></ul>',
+                        config: '<ul><li>최대 검색 개수: 5개</li><li>컨텍스트 길이: 4000토큰</li></ul>',
+                        api: '<code>GET /retrieve/{ids}</code><br>Response: {"documents": [{"content": "..."}]}',
+                        performance: '<ul><li>검색 시간: 20ms</li><li>처리량: 1000 QPS</li></ul>'
+                    },
+                    'context': {
+                        tech: '<ul><li>텍스트 결합</li><li>토큰 수 제한</li><li>우선순위 정렬</li></ul>',
+                        config: '<ul><li>최대 토큰: 3000</li><li>정렬: 유사도 순</li><li>구분자: "\\n\\n---\\n\\n"</li></ul>',
+                        api: '<code>POST /context/build</code><br>Response: {"context": "결합된 텍스트"}',
+                        performance: '<ul><li>구성 시간: 50ms</li><li>압축률: 60%</li></ul>'
+                    },
+                    'prompt': {
+                        tech: '<ul><li>템플릿 엔진 (Jinja2)</li><li>프롬프트 최적화</li></ul>',
+                        config: '<ul><li>템플릿: system + user prompt</li><li>최대 길이: 4000토큰</li></ul>',
+                        api: '<code>POST /prompt/generate</code><br>Response: {"prompt": "완성된 프롬프트"}',
+                        performance: '<ul><li>생성 시간: 10ms</li><li>토큰 효율성: 90%</li></ul>'
+                    },
+                    'llm': {
+                        tech: '<ul><li>OpenAI GPT-4o-mini</li><li>LangChain (오케스트레이션)</li><li>tiktoken (토큰 관리)</li></ul>',
+                        config: '<ul><li>모델: gpt-4o-mini</li><li>온도: 0.1</li><li>최대 토큰: 1000</li></ul>',
+                        api: '<code>POST /llm/generate</code><br>Response: {"answer": "생성된 답변"}',
+                        performance: '<ul><li>응답 시간: 2-5초</li><li>비용: $0.15/1M 토큰</li></ul>'
+                    },
+                    'source': {
+                        tech: '<ul><li>메타데이터 매핑</li><li>문서 ID 추적</li><li>페이지 번호 표시</li></ul>',
+                        config: '<ul><li>출처 형식: "문서명 (페이지 X)"</li><li>최대 출처: 3개</li></ul>',
+                        api: '<code>GET /sources/{query_id}</code><br>Response: {"sources": ["문서1", "문서2"]}',
+                        performance: '<ul><li>조회 시간: 5ms</li><li>정확도: 100%</li></ul>'
+                    },
+                    'format': {
+                        tech: '<ul><li>HTML/Markdown 포맷팅</li><li>텍스트 정리</li><li>구조화</li></ul>',
+                        config: '<ul><li>형식: Markdown</li><li>구조: 답변 + 출처 + 이미지</li><li>최대 길이: 2000자</li></ul>',
+                        api: '<code>POST /format</code><br>Response: {"formatted": "포맷된 응답"}',
+                        performance: '<ul><li>포맷팅 시간: 20ms</li><li>가독성 점수: 85%</li></ul>'
+                    },
+                    'image-attach': {
+                        tech: '<ul><li>이미지 매칭 로직</li><li>Base64 인코딩</li><li>썸네일 생성</li><li>메타데이터 연결</li></ul>',
+                        config: '<ul><li>최대 이미지: 3개</li><li>썸네일 크기: 300x400</li><li>형식: PNG/JPEG</li><li>압축률: 80%</li></ul>',
+                        api: '<code>POST /attach/images</code><br>Body: {"source_ids": [1,2,3]}<br>Response: {"images": [{"page": 1, "url": "..."}]}',
+                        performance: '<ul><li>매칭 시간: 100ms</li><li>이미지 로딩: 200ms</li><li>압축률: 70%</li></ul>'
+                    },
+                    'response': {
+                        tech: '<ul><li>JSON 응답</li><li>이미지 Base64 인코딩</li><li>HTTP 상태 코드</li><li>로깅</li></ul>',
+                        config: '<ul><li>인코딩: UTF-8</li><li>형식: JSON</li><li>이미지 포함: Base64</li><li>로그 레벨: INFO</li></ul>',
+                        api: '<code>GET /response/{query_id}</code><br>Response: {"answer": "...", "sources": [...], "images": [{"page": 1, "data": "base64..."}]}',
+                        performance: '<ul><li>응답 시간: 즉시</li><li>성공률: 99.5%</li><li>이미지 포함 시: +500ms</li></ul>'
+                    }
+                };
+                
+                return details[nodeId] || {
+                    tech: '상세 기술 정보를 준비 중입니다.',
+                    config: '설정 정보를 준비 중입니다.',
+                    api: 'API 문서를 준비 중입니다.',
+                    performance: '성능 지표를 준비 중입니다.'
+                };
+            }
+
+            closeDetailPanel() {
+                this.detailPanel.classList.remove('visible');
+            }
+
+            render() {
+                this.updateTransform();
+                this.renderNodes();
+                this.renderConnections();
+                this.updateSVGDimensions();
+            }
+
+            updateTransform() {
+                this.viewport.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+            }
+
+            renderNodes() {
+                this.nodesLayer.innerHTML = '';
+                
+                this.nodes.forEach(node => {
+                    const nodeEl = document.createElement('div');
+                    nodeEl.className = `node node-type-${node.type}`;
+                    nodeEl.style.left = `${node.x}px`;
+                    nodeEl.style.top = `${node.y}px`;
+                    
+                    nodeEl.innerHTML = `
+                        <div class="node-header">
+                            <span class="node-icon">${node.icon}</span>
+                            <span class="node-title">${node.title}</span>
+                        </div>
+                        <div class="node-description">${node.description}</div>
+                    `;
+                    
+                    this.nodesLayer.appendChild(nodeEl);
+                });
+            }
+
+            renderConnections() {
+                const svgContent = this.svgLayer.querySelector('defs').outerHTML;
+                let connectionsHTML = '';
+                
+                this.connections.forEach(conn => {
+                    const fromNode = this.nodes.find(n => n.id === conn.from);
+                    const toNode = this.nodes.find(n => n.id === conn.to);
+                    
+                    if (fromNode && toNode) {
+                        const fromX = fromNode.x + 200;
+                        const fromY = fromNode.y + 40;
+                        const toX = toNode.x;
+                        const toY = toNode.y + 40;
+                        
+                        const midX = (fromX + toX) / 2;
+                        const path = `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
+                        
+                        connectionsHTML += `<path d="${path}" class="connection-line connection-${conn.type}"/>`;
+                    }
+                });
+                
+                this.svgLayer.innerHTML = svgContent + connectionsHTML;
+            }
+
+            updateSVGDimensions() {
+                const rect = this.canvas.getBoundingClientRect();
+                this.svgLayer.setAttribute('width', rect.width * 2);
+                this.svgLayer.setAttribute('height', rect.height * 2);
+            }
+
+            fitToScreen() {
+                if (this.nodes.length === 0) return;
+                
+                const padding = 50;
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                
+                this.nodes.forEach(node => {
+                    minX = Math.min(minX, node.x);
+                    minY = Math.min(minY, node.y);
+                    maxX = Math.max(maxX, node.x + 200);
+                    maxY = Math.max(maxY, node.y + 80);
+                });
+                
+                const contentWidth = maxX - minX;
+                const contentHeight = maxY - minY;
+                const rect = this.canvas.getBoundingClientRect();
+                
+                const scaleX = (rect.width - padding * 2) / contentWidth;
+                const scaleY = (rect.height - padding * 2) / contentHeight;
+                this.scale = Math.min(scaleX, scaleY, 1);
+                
+                this.panX = (rect.width - contentWidth * this.scale) / 2 - minX * this.scale;
+                this.panY = (rect.height - contentHeight * this.scale) / 2 - minY * this.scale;
+                
+                this.render();
+            }
+
+            zoomIn() {
+                this.scale = Math.min(3, this.scale * 1.2);
+                this.render();
+            }
+
+            zoomOut() {
+                this.scale = Math.max(0.1, this.scale / 1.2);
+                this.render();
+            }
+
+            exportWorkflow() {
+                const data = {
+                    nodes: this.nodes,
+                    connections: this.connections,
+                    metadata: {
+                        name: "간편형 문서 기반 QA 시스템",
+                        version: "1.0",
+                        exported: new Date().toISOString()
+                    }
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'simplified-rag-architecture.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            saveLayout() {
+                try {
+                    const layout = {
+                        nodes: this.nodes,
+                        pan: { x: this.panX, y: this.panY },
+                        scale: this.scale,
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem('simplified-rag-layout', JSON.stringify(layout));
+                } catch (error) {
+                    console.warn('레이아웃 저장 실패:', error);
+                }
+            }
+        }
+
+        // 전역 객체로 에디터 인스턴스 생성
+        const editor = new SimplifiedRAGEditor();
+    </script>
+</body>
+</html>
