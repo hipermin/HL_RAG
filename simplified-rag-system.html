@@ -276,6 +276,14 @@
             box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3);
         }
 
+        .node.dragging {
+            border-color: #10b981;
+            box-shadow: 0 12px 40px rgba(16, 185, 129, 0.4);
+            transform: scale(1.05);
+            z-index: 1000;
+            cursor: grabbing !important;
+        }
+
         .node-header {
             display: flex;
             align-items: center;
@@ -944,8 +952,13 @@
                 this.mouseMovedThreshold = 5;
                 this.initialMousePos = { x: 0, y: 0 };
                 
-                this.initializeNodes();
+                // 저장된 레이아웃 로드 시도
+                if (!this.loadLayout()) {
+                    console.log('저장된 레이아웃이 없어 기본 배치를 사용합니다.');
+                    this.initializeNodes(); // 저장된 레이아웃이 없을 때만 기본 노드 생성
+                }
                 this.initializeConnections();
+                
                 this.bindEvents();
                 this.render();
                 
@@ -1058,6 +1071,8 @@
                         x: e.clientX - clickedNode.x * this.scale,
                         y: e.clientY - clickedNode.y * this.scale
                     };
+                    // 드래그 시작 시 시각적 피드백
+                    this.canvas.style.cursor = 'grabbing';
                 } else {
                     this.isDragging = true;
                     this.dragStart = { x: e.clientX - this.panX, y: e.clientY - this.panY };
@@ -1085,6 +1100,7 @@
                                  Math.abs(e.clientY - this.initialMousePos.y) > this.mouseMovedThreshold;
                     
                     if (moved) {
+                        console.log('노드가 이동되었습니다. 레이아웃을 저장합니다.', this.selectedNode.name, 'at', this.selectedNode.x, this.selectedNode.y);
                         this.saveLayout();
                     } else if (this.selectedNode) {
                         this.showNodeDetails(this.selectedNode);
@@ -1094,6 +1110,9 @@
                 this.isDragging = false;
                 this.isNodeDragging = false;
                 this.selectedNode = null;
+                
+                // 커서 원래대로 복원
+                this.canvas.style.cursor = 'default';
             }
 
             handleWheel(e) {
@@ -1423,6 +1442,24 @@
                 } catch (error) {
                     console.warn('레이아웃 저장 실패:', error);
                 }
+            }
+
+            loadLayout() {
+                try {
+                    const saved = localStorage.getItem('simplified-rag-layout');
+                    if (saved) {
+                        const layout = JSON.parse(saved);
+                        console.log('저장된 레이아웃을 복원합니다:', layout.nodes?.length, '개 노드');
+                        this.nodes = layout.nodes || this.nodes;
+                        this.panX = layout.pan?.x || 0;
+                        this.panY = layout.pan?.y || 0;
+                        this.scale = layout.scale || 1;
+                        return true;
+                    }
+                } catch (error) {
+                    console.warn('레이아웃 로드 실패:', error);
+                }
+                return false;
             }
         }
 
